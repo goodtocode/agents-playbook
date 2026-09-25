@@ -13,15 +13,15 @@ public sealed class PlaybookExecutorTests
         var definition = new TestPlaybook(calls);
         var executor = new PlaybookExecutor<string, string, string, string>();
 
-        var result = await executor.ExecuteAsync(definition, "input");
+        var result = await executor.ExecuteAsync(definition, "input", TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { "collect", "evaluate", "record" }, calls);
+        Assert.AreSequenceEqual(["collect", "evaluate", "record"], calls);
         Assert.AreEqual("input-evidence", result.Evidence);
         Assert.AreEqual("input-evidence-finding", result.Finding);
         Assert.AreEqual("input-evidence-finding-materialized", result.Materialization);
         Assert.AreEqual("test-playbook", result.Metadata.PlaybookKey);
         Assert.AreEqual("1.0", result.Metadata.Version);
-        Assert.IsTrue(result.Metadata.CompletedUtc >= result.Metadata.StartedUtc);
+        Assert.IsGreaterThanOrEqualTo(result.Metadata.StartedUtc, result.Metadata.CompletedUtc);
     }
 
     [TestMethod]
@@ -34,9 +34,9 @@ public sealed class PlaybookExecutorTests
             new PlaybookIdentity("contextual-playbook", "2.0"));
         var executor = new PlaybookExecutor<string, string, string, string>();
 
-        var result = await executor.ExecuteAsync(definition, "input", context);
+        var result = await executor.ExecuteAsync(definition, "input", context, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { "collect", "contextual-evaluate", "contextual-record" }, calls);
+        Assert.AreSequenceEqual(["collect", "contextual-evaluate", "contextual-record"], calls);
         Assert.AreEqual("instruction", result.Finding);
         Assert.AreEqual("contextual-playbook", result.Materialization);
     }
@@ -58,9 +58,9 @@ public sealed class PlaybookExecutorTests
     {
         var evaluator = new TestPolicyEvaluator();
 
-        var result = await evaluator.EvaluateAsync("evidence");
+        var result = await evaluator.EvaluateAsync("evidence", TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { "validate", "evaluate" }, evaluator.Calls);
+        Assert.AreSequenceEqual(["validate", "evaluate"], evaluator.Calls);
         Assert.AreEqual("evidence-finding", result);
     }
 
@@ -155,4 +155,6 @@ public sealed class PlaybookExecutorTests
             return Task.FromResult($"{evidence}-finding");
         }
     }
+
+    public TestContext TestContext { get; set; }
 }
