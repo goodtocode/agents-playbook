@@ -2,6 +2,175 @@
 
 Strongly typed Collect, Evaluate, and Record (CER) playbook contracts with a deterministic execution engine.
 
-The package defines a small host-independent execution boundary. A playbook supplies typed stages, and `PlaybookExecutor` invokes them in order while returning typed outputs and execution metadata. Evaluate and Record stages may optionally consume explicit knowledge, identity, rubric, and governance metadata through `PlaybookExecutionContext`.
 
-The core package is independent of Microsoft Agent Framework, persistence, and transport formats. Hosts can execute the same typed playbook deterministically or adapt it to a workflow runtime.
+[![NuGet CI/CD](https://github.com/Goodtocode/agents-playbook/actions/workflows/agents-playbook-nuget.yml/badge.svg)](https://github.com/Goodtocode/agents-playbook/actions/workflows/agents-playbook-nuget.yml)
+[![NuGet](https://img.shields.io/nuget/v/Goodtocode.Agents.Playbook.svg)](https://www.nuget.org/packages/Goodtocode.Agents.Playbook)
+
+Strongly typed **Collect, Evaluate, and Record (CER)** playbook contracts with deterministic execution for .NET applications and AI-agent workflows.
+
+Goodtocode.Agents.Playbook gives a host a small, explicit execution boundary:
+
+1. **Collect** converts typed input into typed evidence.
+2. **Evaluate** converts evidence into a typed finding.
+3. **Record** converts the finding into a typed materialization.
+
+The executor owns ordering, cancellation, optional execution context, and execution metadata. Your application owns the actual collection, policy, model calls, persistence, and transport.
+
+## Why Playbook?
+
+AI workflows often grow into a collection of framework-specific helpers: one package for prompt orchestration, another for evaluation, another for tracing, and another for persistence. That can make the business flow difficult to discover and the contracts difficult to test.
+
+Playbook provides one small, framework-independent contract for the part that should remain stable across those choices:
+
+- **Typed boundaries:** input, evidence, finding, and materialization are generic types rather than loosely shaped dictionaries.
+- **Deterministic orchestration:** CER stages run in a fixed order and receive the same cancellation signal.
+- **Explicit context:** knowledge, identity, rubric, and host governance metadata are passed deliberately instead of hidden in ambient state.
+- **Incremental adoption:** existing stage implementations use the basic interfaces; context-aware Evaluate and Record stages are opt-in.
+- **Testable by design:** stage behavior can be tested without an agent framework, model provider, database, or web host.
+- **Small dependency surface:** the core package targets .NET 10 and does not require Microsoft Agent Framework, Semantic Kernel, a model SDK, or a persistence provider.
+
+This is not a replacement for an agent framework. It is the typed playbook boundary that can sit underneath one.
+
+## Install
+
+```powershell
+dotnet add package Goodtocode.Agents.Playbook
+```
+
+The package is published to NuGet. Pin a version in production and commit your dependency lock information according to your repository policy:
+
+```powershell
+dotnet add package Goodtocode.Agents.Playbook --version <version>
+```
+
+## Quick Start
+
+Define the three stages and compose them into a playbook:
+
+```csharp
+using Goodtocode.Agents.Playbook.Execution;
+using Goodtocode.Agents.Playbook.Steps;
+
+public sealed record ReviewRequest(string Document);
+public sealed record ReviewEvidence(string Document, IReadOnlyList<string> Sources);
+public sealed record ReviewFinding(bool Approved, string Summary);
+public sealed record ReviewRecord(string Status, string Summary);
+
+public sealed class CollectReviewEvidence : ICollectStep<ReviewRequest, ReviewEvidence>
+{
+	public Task<ReviewEvidence> ExecuteAsync(
+		ReviewRequest input,
+		CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		return Task.FromResult(new ReviewEvidence(
+			input.Document,
+			["policy://review/v1"]));
+	}
+}
+
+public sealed class EvaluateReview : IEvaluateStep<ReviewEvidence, ReviewFinding>
+{
+	public Task<ReviewFinding> EvaluateAsync(
+		ReviewEvidence evidence,
+		CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		var approved = !string.IsNullOrWhiteSpace(evidence.Document);
+		return Task.FromResult(new ReviewFinding(
+			approved,
+			approved ? "Document is ready for review." : "Document is empty."));
+	}
+}
+
+public sealed class RecordReview : IRecordStep<ReviewFinding, ReviewRecord>
+{
+	public Task<ReviewRecord> RecordAsync(
+		ReviewFinding finding,
+		CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		return Task.FromResult(new ReviewRecord(
+			finding.Approved ? "approved" : "rejected",
+			finding.Summary));
+	}
+}
+
+public sealed class DocumentReviewPlaybook
+	: IPlaybookSteps<ReviewRequest, ReviewEvidence, ReviewFinding, ReviewRecord>
+{
+	public string PlaybookKey => "document-review";
+	public string Version => "1.0";
+	public ICollectStep<ReviewRequest, ReviewEvidence> Collect { get; } = new CollectReviewEvidence();
+	public IEvaluateStep<ReviewEvidence, ReviewFinding> Evaluate { get; } = new EvaluateReview();
+	public IRecordStep<ReviewFinding, ReviewRecord> Record { get; } = new RecordReview();
+}
+```
+
+Execute it from an application, service, worker, or agent adapter:
+
+```csharp
+var executor = new PlaybookExecutor<ReviewRequest, ReviewEvidence, ReviewFinding, ReviewRecord>();
+var result = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	cancellationToken);
+
+Console.WriteLine(result.Materialization.Status);
+Console.WriteLine(result.Metadata.PlaybookKey);
+Console.WriteLine(result.Metadata.CompletedUtc);
+```
+
+`result` contains the typed `Evidence`, `Finding`, and `Materialization`, plus `PlaybookExecutionMetadata` with the playbook key, version, start time, and completion time.
+
+## Explicit Execution Context
+
+Evaluate and Record stages can opt into typed knowledge and identity without changing the basic CER contract:
+
+```csharp
+var context = new PlaybookExecutionContext(
+	new PlaybookKnowledge(
+		"Use the approved review rubric.",
+		[new PlaybookKnowledgeItem("policy", "policy://review/v1")]),
+	new PlaybookIdentity(
+		"document-review",
+		"1.0",
+		ExecutionId: "run-123"),
+	new PlaybookGovernanceContext(PolicyVersion: "review-policy-1"));
+
+var result = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	context,
+	cancellationToken);
+```
+
+Context-aware stages implement `IContextualEvaluateStep<,>` or `IContextualRecordStep<,>`. The executor dispatches to those contracts when present and preserves the ordinary stage contract otherwise.
+
+For policy stages that should validate evidence before applying policy, derive from `PolicyEvaluateDefinitionBase<TEvidence, TFinding>` and implement `ValidateEvidenceAsync` and `EvaluatePolicyAsync`.
+
+## Compatibility
+
+The core package is independent of:
+
+- Microsoft Agent Framework
+- Microsoft.Extensions.AI
+- Semantic Kernel
+- model providers
+- persistence and transport formats
+- web hosting and worker runtimes
+
+Adapters can call model or tool APIs inside a stage while the playbook contract remains stable.
+
+## Development
+
+```powershell
+dotnet build Goodtocode.Agents.Playbook.slnx
+dotnet test Goodtocode.Agents.Playbook.slnx
+```
+
+The repository contains the library in `src/Goodtocode.Agents.Playbook` and focused tests in `src/Goodtocode.Agents.Playbook.Tests`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
