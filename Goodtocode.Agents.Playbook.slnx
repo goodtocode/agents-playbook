@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Goodtocode.Agents.Playbook.Tests/Goodtocode.Agents.Playbook.Tests.csproj" />
+  <Project Path="src/Goodtocode.Agents.Playbook/Goodtocode.Agents.Playbook.csproj" />
+</Solution>

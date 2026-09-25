@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+    <RootNamespace>Goodtocode.Agents.Playbook</RootNamespace>
+    <AssemblyName>Goodtocode.Agents.Playbook</AssemblyName>
+		<Version>1.0.0</Version>
+		<FileVersion>1.0.0</FileVersion>
+		<AssemblyVersion>1.0.0</AssemblyVersion>
+		<InformationalVersion>1.0.0</InformationalVersion>
+    <TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+		<PackageId>Goodtocode.Agents.Playbook</PackageId>
+		<Authors>Robert Good</Authors>
+		<Company>Goodtocode</Company>
+    <Description>Strongly typed Collect, Evaluate, and Record playbook contracts with deterministic execution.</Description>
+		<PackageTags>ai;playbook;workflow;collect;evaluate;record;deterministic</PackageTags>
+		<RepositoryUrl>https://github.com/Goodtocode/agents-playbook</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/Goodtocode/agents-playbook</PackageProjectUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<Copyright>Copyright © 2026 Goodtocode</Copyright>
+		<PackageIcon>Goodtocode-icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="Goodtocode-icon.png" Pack="true" PackagePath="" />
+		<None Include="..\..\README.md" Pack="true" PackagePath="" />
+	</ItemGroup>
+
+</Project>

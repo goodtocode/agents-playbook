@@ -1,0 +1,150 @@
+name: NuGet CI/CD
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/agents-playbook-nuget.yml
+      - src/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/agents-playbook-nuget.yml
+      - src/**
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to run"
+        required: true
+        default: "development"
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+env:
+  CONFIGURATION: "Release"
+  SCRIPTS_PATH: "./.github/scripts"
+  SRC_PATH: "./src"
+  PROJECT_PATH: "Goodtocode.Agents.Playbook"
+  PROJECT_FILE: "Goodtocode.Agents.Playbook.csproj"
+  SRC_SLN: "Goodtocode.Agents.Playbook.slnx"
+  TEST_PATH: "Goodtocode.Agents.Playbook.Tests"
+  TEST_PROJECT: "Goodtocode.Agents.Playbook.Tests.csproj"
+jobs:
+  ci:
+    name: "NuGet CI"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    environment: development
+    strategy:
+      matrix:
+        DOTNET_VERSION: ["10.x"]
+    env:
+      RUNTIME_ENV: "Development"
+      CONFIGURATION: "Release"
+      VERSION_MAJOR: '1'
+      VERSION_MINOR: '1'
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+
+      - name: dotnet version ${{ matrix.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ matrix.DOTNET_VERSION }}
+
+      - name: Get Semantic Version
+        id: get_version
+        run: |
+          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major ${{ env.VERSION_MAJOR }} -Minor ${{ env.VERSION_MINOR }} -Patch $env:GITHUB_RUN_NUMBER
+          $versionObj = ($json | ConvertFrom-Json)
+          echo "SEMANTIC_VERSION=$($versionObj.SemanticVersion)" >> $env:GITHUB_OUTPUT
+          echo "FILE_VERSION=$($versionObj.FileVersion)" >> $env:GITHUB_OUTPUT
+          echo "ASSEMBLY_VERSION=$($versionObj.AssemblyVersion)" >> $env:GITHUB_OUTPUT
+          echo "INFORMATIONAL_VERSION=$($versionObj.InformationalVersion)" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Set-Version.ps1
+        run: |
+          $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major ${{ env.VERSION_MAJOR }} -Minor ${{ env.VERSION_MINOR }} -Patch $env:GITHUB_RUN_NUMBER
+          echo $version
+          echo "VERSION=$version" >> $GITHUB_ENV
+        shell: pwsh
+
+      - name: pipeline environment configuration
+        run: |
+          echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
+        shell: pwsh
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: csharp
+
+      - name: Build
+        run: |
+          dotnet build ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
+        shell: pwsh
+
+      - name: Test
+        run: dotnet test ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
+        shell: pwsh
+
+      - name: Pack NuGet package
+        run: |
+          dotnet pack ${{ env.SRC_PATH }}/${{ env.PROJECT_PATH }}/${{ env.PROJECT_FILE }} --configuration ${{ env.CONFIGURATION }} --no-build --output nupkg_output --version ${{ steps.get_version.outputs.SEMANTIC_VERSION }}
+        shell: pwsh
+
+      - name: Upload NuGet package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nuget-package
+          path: nupkg_output/*.nupkg
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        if: ${{ !github.event.repository.private }}
+
+  cd:
+    name: "NuGet CD"
+    runs-on: ubuntu-latest
+    needs: ci
+    if: |
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true) && github.event.inputs.environment == 'production')
+    environment: production
+    strategy:
+      matrix:
+        DOTNET_VERSION: ["10.x"]
+    env:
+      NUGET_OUTPUT: "nupkg_output"
+    steps:
+      - name: Download NuGet package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: nuget-package
+          path: ${{ env.NUGET_OUTPUT }}
+
+      - name: NuGet Login (OIDC trusted publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish to NuGet.org
+        run: |
+          dotnet nuget push ${{ env.NUGET_OUTPUT }}/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        shell: pwsh

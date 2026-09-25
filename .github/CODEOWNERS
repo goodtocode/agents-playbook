@@ -1,0 +1,11 @@
+# Replace placeholder owners with real GitHub users or teams.
+
+# Default ownership
+* @OWNER
+
+# Repository documentation and automation
+/.github/ @OWNER
+/docs/product/ @OWNER
+
+# Library and tests
+/src/ @OWNER
