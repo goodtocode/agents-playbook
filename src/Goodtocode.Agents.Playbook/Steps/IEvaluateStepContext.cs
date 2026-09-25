@@ -7,7 +7,7 @@ namespace Goodtocode.Agents.Playbook.Steps;
 /// </summary>
 /// <typeparam name="TEvidence">The evidence consumed by evaluation.</typeparam>
 /// <typeparam name="TFinding">The finding produced by evaluation.</typeparam>
-public interface IContextualEvaluateStep<in TEvidence, TFinding>
+public interface IEvaluateStepContext<in TEvidence, TFinding>
 {
     /// <summary>
     /// Evaluates evidence using explicit typed execution context.

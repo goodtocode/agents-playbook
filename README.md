@@ -149,6 +149,103 @@ Context-aware stages implement `IContextualEvaluateStep<,>` or `IContextualRecor
 
 For policy stages that should validate evidence before applying policy, derive from `PolicyEvaluateDefinitionBase<TEvidence, TFinding>` and implement `ValidateEvidenceAsync` and `EvaluatePolicyAsync`.
 
+## Repeatability Replay Modes
+
+"Repeat this playbook" is ambiguous unless the caller declares *which* of three replay modes it
+means. `PlaybookReplayContext<TEvidence, TFinding>` makes that declaration explicit and the executor
+enforces the corresponding stage behavior:
+
+- **Rerun** (default): run Collect, Evaluate, and Record fresh. This is what happens when no
+  `PlaybookReplayContext` is supplied, and it is the correct mode for "has the source changed" or
+  "is the evaluator still scoring consistently" — a different result is expected, not an error.
+- **Recall**: skip Collect and Evaluate; reuse `PriorEvidence` and `PriorFinding` and run only
+  Record. Use this to re-render a materialization from a persisted result without any inference
+  cost or drift risk.
+- **Replay**: skip Collect, reuse `PriorEvidence`, but re-run Evaluate and Record to verify a
+  governed result reproduces exactly against the same evidence.
+
+```csharp
+using Goodtocode.Agents.Playbook.Execution;
+
+var executor = new PlaybookExecutor<ReviewRequest, ReviewEvidence, ReviewFinding, ReviewRecord>();
+
+// Rerun (default) — fresh Collect + Evaluate + Record.
+var rerun = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	new PlaybookReplayContext<ReviewEvidence, ReviewFinding>(),
+	cancellationToken);
+
+// Recall — rehydrate a prior execution, no inference.
+var recall = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	new PlaybookReplayContext<ReviewEvidence, ReviewFinding>(
+		PlaybookReplayMode.Recall,
+		SourceExecutionId: "run-123",
+		PriorEvidence: rerun.Evidence,
+		PriorFinding: rerun.Finding),
+	cancellationToken);
+
+// Replay — reuse the prior evidence, re-run Evaluate to verify exact reproduction.
+var replay = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	new PlaybookReplayContext<ReviewEvidence, ReviewFinding>(
+		PlaybookReplayMode.Replay,
+		SourceExecutionId: "run-123",
+		PriorEvidence: rerun.Evidence),
+	cancellationToken);
+```
+
+`result.Metadata.ReplayMode` and `result.Metadata.SourceExecutionId` are always populated so a host
+can persist which mode produced a given execution. `Recall` and `Replay` throw
+`InvalidOperationException` if `SourceExecutionId`/`PriorEvidence` (and, for `Recall`,
+`PriorFinding`) are missing.
+
+This capability is the CER-level building block for the four governance pillars (observability,
+auditability, defensibility, repeatability) described in
+[Goodtocode.Agents.Governance](https://github.com/Goodtocode/agents-governance); wiring the four
+pillars into playbook execution context is planned as a follow-up.
+
+## Named, Tool-Attributed Steps
+
+`ICollectStep<,>`/`IEvaluateStep<,>`/`IRecordStep<,>` are the pure workflow-stage contracts — what a
+stage does. `ICollectStepTool<,>`/`IEvaluateStepTool<,>`/`IRecordStepTool<,>` extend those with a
+`ToolName`, because execution is tool-based: a host needs to know *which* registered tool performed
+a stage for auditability, tool-selection, and future multi-tool-per-stage scenarios. These are two
+different concerns — the stage contract is the workflow definition; the tool contract is the
+attributable execution unit — and the tool contracts are a strict extension, so any existing `IEvaluateStep<,>`
+implementation is already usable wherever the plain stage contract is expected.
+
+```csharp
+public sealed class SqlBlockingCollectTool : ICollectStepTool<SqlBlockingRequest, SqlBlockingEvidence>
+{
+	public string ToolName => "sql.blocking.collect";
+
+	public Task<SqlBlockingEvidence> ExecuteAsync(
+		SqlBlockingRequest input,
+		CancellationToken cancellationToken = default) => ...;
+}
+```
+
+## Observing Stage Activity
+
+`PlaybookExecutor.ExecuteAsync` accepts an optional `IPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>`
+so a host can persist or emit observability/auditability evidence after each stage without the
+executor knowing about any storage concern. When a stage implementation is also an `*StepTool`, the
+recorder is told which tool produced the result; otherwise it receives `null`. No recorder is
+required — omitting it is a no-op.
+
+```csharp
+var executor = new PlaybookExecutor<ReviewRequest, ReviewEvidence, ReviewFinding, ReviewRecord>();
+var result = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	cancellationToken,
+	activityRecorder: myActivityStoreAdapter);
+```
+
 ## Compatibility
 
 The core package is independent of:

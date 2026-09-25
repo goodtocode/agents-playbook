@@ -19,4 +19,6 @@ public sealed record PlaybookExecutionMetadata(
     string PlaybookKey,
     string Version,
     DateTimeOffset StartedUtc,
-    DateTimeOffset CompletedUtc);
+    DateTimeOffset CompletedUtc,
+    PlaybookReplayMode ReplayMode = PlaybookReplayMode.Rerun,
+    string? SourceExecutionId = null);

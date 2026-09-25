@@ -8,7 +8,7 @@ public sealed record PlaybookQueryDefinition(string QueryKey, string CommandText
 /// <summary>
 /// Deterministic CER fact payload for controls that evaluate observed state against expected state and threshold.
 /// </summary>
-public sealed record PlaybookCerFacts(
+public sealed record PlaybookFacts(
     string Threshold,
     string ExpectedValue,
     string CollectedValue,
