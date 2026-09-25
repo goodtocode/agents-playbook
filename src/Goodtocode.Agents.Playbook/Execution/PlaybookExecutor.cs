@@ -1,0 +1,77 @@
+using Goodtocode.Agents.Playbook.Steps;
+
+namespace Goodtocode.Agents.Playbook.Execution;
+
+/// <summary>
+/// Executes a typed Collect, Evaluate, and Record playbook in deterministic order.
+/// </summary>
+/// <typeparam name="TCollectInput">The input required by collection.</typeparam>
+/// <typeparam name="TEvidence">The evidence produced by collection.</typeparam>
+/// <typeparam name="TFinding">The finding produced by evaluation.</typeparam>
+/// <typeparam name="TMaterialization">The materialization produced by recording.</typeparam>
+public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMaterialization>
+{
+    /// <summary>
+    /// Executes all three CER stages and returns their typed results.
+    /// </summary>
+    public async Task<PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>> ExecuteAsync(
+        IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterialization> definition,
+        TCollectInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var startedUtc = DateTimeOffset.UtcNow;
+        var evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
+        var finding = await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
+        var materialization = await definition.Record.RecordAsync(finding, cancellationToken);
+        var completedUtc = DateTimeOffset.UtcNow;
+
+        return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
+            evidence,
+            finding,
+            materialization,
+            new PlaybookExecutionMetadata(
+                definition.PlaybookKey,
+                definition.Version,
+                startedUtc,
+                completedUtc));
+    }
+
+    /// <summary>
+    /// Executes all three CER stages with explicit typed knowledge and governance context.
+    /// Context-aware Evaluate and Record stages receive the context; legacy deterministic
+    /// stages continue to execute through their original contracts.
+    /// </summary>
+    public async Task<PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>> ExecuteAsync(
+        IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterialization> definition,
+        TCollectInput input,
+        PlaybookExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var startedUtc = DateTimeOffset.UtcNow;
+        var evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
+        var finding = definition.Evaluate is IContextualEvaluateStep<TEvidence, TFinding> contextualEvaluate
+            ? await contextualEvaluate.EvaluateAsync(evidence, context, cancellationToken)
+            : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
+        var materialization = definition.Record is IContextualRecordStep<TFinding, TMaterialization> contextualRecord
+            ? await contextualRecord.RecordAsync(finding, context, cancellationToken)
+            : await definition.Record.RecordAsync(finding, cancellationToken);
+        var completedUtc = DateTimeOffset.UtcNow;
+
+        return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
+            evidence,
+            finding,
+            materialization,
+            new PlaybookExecutionMetadata(
+                definition.PlaybookKey,
+                definition.Version,
+                startedUtc,
+                completedUtc));
+    }
+}

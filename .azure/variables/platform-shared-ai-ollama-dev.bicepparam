@@ -1,0 +1,39 @@
+using '../templates/platform-shared-ai-ollama.bicep'
+
+// =====================
+// Common
+// =====================
+var scopeOwner = 'ScopeOrTenant'
+var productIac = 'spoke-ai'
+var environmentIac = 'dev'
+var regionIac = 'wus2'
+var instanceIac = '001'
+var storageAccountProductIac = take(replace(productIac, '-', ''), 24 - length(environmentIac) - length(regionIac) - length(instanceIac) - 3)
+param location = 'westus2'
+param tags = {
+  Environment: environmentIac
+  CostCenter: '0000'
+  project: productIac
+  owner: scopeOwner
+}
+
+// =====================
+// Spoke AI in SPOKE_MGMT_RG_NAME
+// =====================
+param environmentName = '${productIac}-${environmentIac}-${regionIac}-${instanceIac}-acaenv'
+param containerAppName = '${productIac}-${environmentIac}-${regionIac}-${instanceIac}-ollama'
+param stAccountName = '${storageAccountProductIac}${environmentIac}${regionIac}${instanceIac}oll'
+param storageShareName = 'ollama-models'
+
+param modelName = 'phi4'
+param containerImage = 'ollama/ollama:latest'
+param cpuCores = 2
+param memoryGiB = '4Gi'
+param minReplicas = 1
+param maxReplicas = 1
+param stSku = 'Standard_LRS'
+param ingressExternal = true
+// RFC5737 TEST-NET-3 placeholder; replace with real caller egress CIDRs before deployment.
+param ingressAllowedCidrs = [
+  '203.0.113.0/24'
+]
