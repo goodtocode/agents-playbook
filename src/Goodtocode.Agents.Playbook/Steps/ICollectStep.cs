@@ -12,3 +12,4 @@ public interface ICollectStep<in TCollectInput, TEvidence>
     /// </summary>
     Task<TEvidence> ExecuteAsync(TCollectInput input, CancellationToken cancellationToken = default);
 }
+

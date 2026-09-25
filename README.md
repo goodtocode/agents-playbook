@@ -208,6 +208,44 @@ auditability, defensibility, repeatability) described in
 [Goodtocode.Agents.Governance](https://github.com/Goodtocode/agents-governance); wiring the four
 pillars into playbook execution context is planned as a follow-up.
 
+## Named, Tool-Attributed Steps
+
+`ICollectStep<,>`/`IEvaluateStep<,>`/`IRecordStep<,>` are the pure workflow-stage contracts — what a
+stage does. `ICollectStepTool<,>`/`IEvaluateStepTool<,>`/`IRecordStepTool<,>` extend those with a
+`ToolName`, because execution is tool-based: a host needs to know *which* registered tool performed
+a stage for auditability, tool-selection, and future multi-tool-per-stage scenarios. These are two
+different concerns — the stage contract is the workflow definition; the tool contract is the
+attributable execution unit — and the tool contracts are a strict extension, so any existing `IEvaluateStep<,>`
+implementation is already usable wherever the plain stage contract is expected.
+
+```csharp
+public sealed class SqlBlockingCollectTool : ICollectStepTool<SqlBlockingRequest, SqlBlockingEvidence>
+{
+	public string ToolName => "sql.blocking.collect";
+
+	public Task<SqlBlockingEvidence> ExecuteAsync(
+		SqlBlockingRequest input,
+		CancellationToken cancellationToken = default) => ...;
+}
+```
+
+## Observing Stage Activity
+
+`PlaybookExecutor.ExecuteAsync` accepts an optional `IPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>`
+so a host can persist or emit observability/auditability evidence after each stage without the
+executor knowing about any storage concern. When a stage implementation is also an `*StepTool`, the
+recorder is told which tool produced the result; otherwise it receives `null`. No recorder is
+required — omitting it is a no-op.
+
+```csharp
+var executor = new PlaybookExecutor<ReviewRequest, ReviewEvidence, ReviewFinding, ReviewRecord>();
+var result = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(),
+	new ReviewRequest("Document content"),
+	cancellationToken,
+	activityRecorder: myActivityStoreAdapter);
+```
+
 ## Compatibility
 
 The core package is independent of:

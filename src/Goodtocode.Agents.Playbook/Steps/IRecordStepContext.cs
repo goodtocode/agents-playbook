@@ -7,7 +7,7 @@ namespace Goodtocode.Agents.Playbook.Steps;
 /// </summary>
 /// <typeparam name="TFinding">The finding consumed by recording.</typeparam>
 /// <typeparam name="TMaterialization">The materialization produced for publication.</typeparam>
-public interface IContextualRecordStep<in TFinding, TMaterialization>
+public interface IRecordStepContext<in TFinding, TMaterialization>
 {
     /// <summary>
     /// Materializes a finding using explicit typed execution context.

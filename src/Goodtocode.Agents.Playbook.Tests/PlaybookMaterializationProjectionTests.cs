@@ -6,9 +6,9 @@ namespace Goodtocode.Agents.Playbook.Tests;
 public sealed class PlaybookMaterializationProjectionTests
 {
     [TestMethod]
-    public void PlaybookCerFacts_ToDictionary_merges_dimensions_and_canonical_keys()
+    public void PlaybookFacts_ToDictionary_merges_dimensions_and_canonical_keys()
     {
-        var facts = new PlaybookCerFacts(
+        var facts = new PlaybookFacts(
             Threshold: "avg<30",
             ExpectedValue: "low pressure",
             CollectedValue: "avg=12",

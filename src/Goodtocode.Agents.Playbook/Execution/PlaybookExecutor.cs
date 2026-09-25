@@ -17,15 +17,23 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
     public async Task<PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>> ExecuteAsync(
         IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterialization> definition,
         TCollectInput input,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>? activityRecorder = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         cancellationToken.ThrowIfCancellationRequested();
+        var recorder = activityRecorder ?? NoOpPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>.Instance;
+        var identity = new PlaybookIdentity(definition.PlaybookKey, definition.Version);
 
         var startedUtc = DateTimeOffset.UtcNow;
         var evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
+        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
+
         var finding = await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
+        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
+
         var materialization = await definition.Record.RecordAsync(finding, cancellationToken);
+        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
         var completedUtc = DateTimeOffset.UtcNow;
 
         return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
@@ -48,20 +56,28 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
         IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterialization> definition,
         TCollectInput input,
         PlaybookExecutionContext context,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>? activityRecorder = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
+        var recorder = activityRecorder ?? NoOpPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>.Instance;
+        var identity = new PlaybookIdentity(definition.PlaybookKey, definition.Version);
 
         var startedUtc = DateTimeOffset.UtcNow;
         var evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
-        var finding = definition.Evaluate is IContextualEvaluateStep<TEvidence, TFinding> contextualEvaluate
+        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
+
+        var finding = definition.Evaluate is IEvaluateStepContext<TEvidence, TFinding> contextualEvaluate
             ? await contextualEvaluate.EvaluateAsync(evidence, context, cancellationToken)
             : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
-        var materialization = definition.Record is IContextualRecordStep<TFinding, TMaterialization> contextualRecord
+        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
+
+        var materialization = definition.Record is IRecordStepContext<TFinding, TMaterialization> contextualRecord
             ? await contextualRecord.RecordAsync(finding, context, cancellationToken)
             : await definition.Record.RecordAsync(finding, cancellationToken);
+        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
         var completedUtc = DateTimeOffset.UtcNow;
 
         return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
@@ -89,24 +105,30 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
         IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterialization> definition,
         TCollectInput input,
         PlaybookReplayContext<TEvidence, TFinding> replay,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>? activityRecorder = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(replay);
         replay.Validate();
         cancellationToken.ThrowIfCancellationRequested();
+        var recorder = activityRecorder ?? NoOpPlaybookStepActivityRecorder<TEvidence, TFinding, TMaterialization>.Instance;
+        var identity = new PlaybookIdentity(definition.PlaybookKey, definition.Version, replay.SourceExecutionId);
 
         var startedUtc = DateTimeOffset.UtcNow;
 
         var evidence = replay.Mode is PlaybookReplayMode.Recall or PlaybookReplayMode.Replay
             ? replay.PriorEvidence!
             : await definition.Collect.ExecuteAsync(input, cancellationToken);
+        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
 
         var finding = replay.Mode == PlaybookReplayMode.Recall
             ? replay.PriorFinding!
             : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
+        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
 
         var materialization = await definition.Record.RecordAsync(finding, cancellationToken);
+        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
         var completedUtc = DateTimeOffset.UtcNow;
 
         return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
@@ -121,4 +143,13 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
                 replay.Mode,
                 replay.SourceExecutionId));
     }
+
+    private static string? ResolveToolName<TIn, TOut>(ICollectStep<TIn, TOut> step) =>
+        step is ICollectStepTool<TIn, TOut> tool ? tool.ToolName : null;
+
+    private static string? ResolveToolName<TIn, TOut>(IEvaluateStep<TIn, TOut> step) =>
+        step is IEvaluateStepTool<TIn, TOut> tool ? tool.ToolName : null;
+
+    private static string? ResolveToolName<TIn, TOut>(IRecordStep<TIn, TOut> step) =>
+        step is IRecordStepTool<TIn, TOut> tool ? tool.ToolName : null;
 }
