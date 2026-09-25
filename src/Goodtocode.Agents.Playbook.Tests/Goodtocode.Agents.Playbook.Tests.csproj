@@ -4,7 +4,7 @@
     <RootNamespace>Goodtocode.Agents.Playbook.Tests</RootNamespace>
     <AssemblyName>Goodtocode.Agents.Playbook.Tests</AssemblyName>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>2.0.0</Version>
+    <Version>1.0.0</Version>
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

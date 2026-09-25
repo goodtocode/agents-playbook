@@ -1,40 +1,39 @@
-# Agent Governance - Sprint 0 Ontology
+# Agents Playbook - Sprint 0 Ontology
 
 ## Sprint 0 Outcome
-Sprint 0 completed ontology discovery and normalization for the Goodtocode.Agents.Playbook domain. The team aligned on shared language mapped to the current library API surface.
+Sprint 0 establishes the shared language for a host-independent, strongly typed Collect, Evaluate, and Record playbook engine.
 
 ## Purpose
-Define canonical terms for governance enforcement across AI inference workflows to reduce ambiguity in code, docs, tests, and product planning.
+Define the terms used in the public contracts, execution flow, tests, and product planning for deterministic playbook execution.
 
 ## Canonical Concepts
-- Governance Aggregate: EvaluationGovernanceRecord with PolicyProfileVersion + four pillars.
-- Observability: TraceId, CorrelationId, EvidenceRefs.
-- Repeatability: ModelRef, ModelVersion, PromptHash, InputHash, DeterministicReplaySupported, Seed.
-- Auditability: OwnerId, TenantId, PrincipalDisplay, ToolRefs.
-- Defensibility: PoliciesApplied, JustificationRefs, ReasoningSummary, ConfidenceScore.
-- Enforcement/Validation: GovernanceEvaluationRequest, GovernedEvaluationResult, EvaluationGovernanceValidator, GovernanceValidationIssue, GovernanceValidationException.
-- Prompt Composition: EvaluationGovernancePromptRequest, EvaluationGovernancePromptContext, EvaluationGovernancePromptComposer.
-- Extension Model: IGovernanceDirectiveExtension, GovernanceDirectiveContribution with ordering, uniqueness, and safety checks.
-- Determinism/Replay: RepeatabilityHashService, GovernanceReplaySnapshot, GovernanceReplayGuard.
-- Policy and References: GovernancePillarsProfile, GovernanceReference.
-- Governed Output Contract: GovernedEvaluationOutputSchema + criterion and audit trace types.
+- Playbook: A stable named and versioned definition of typed CER stages.
+- Collect: The first stage, which converts typed input into typed evidence.
+- Evaluate: The second stage, which converts evidence into a typed finding.
+- Record: The third stage, which converts a finding into a typed materialization.
+- Execution: One ordered invocation of a playbook definition by `PlaybookExecutor`.
+- Execution Result: The typed evidence, finding, materialization, and `PlaybookExecutionMetadata` returned by an execution.
+- Execution Context: Optional `PlaybookExecutionContext` containing knowledge, identity, rubric, and host governance metadata.
+- Contextual Stage: An Evaluate or Record stage that additionally implements its contextual contract.
+- Policy Evaluation: The validate-then-evaluate flow provided by `PolicyEvaluateDefinitionBase`.
+- Deterministic Order: Collect completes before Evaluate, and Evaluate completes before Record.
 
 ## Ubiquitous Language (Approved)
-Governance, Policy Profile, Directive, Evidence Reference, Justification Reference, Replay Drift, Governed Output.
+Playbook, Stage, Collect, Evidence, Evaluate, Finding, Record, Materialization, Execution, Context, Definition, Deterministic Order.
 
 ## Synonyms Rejected
-- Guardrail payload -> Governance Record
-- Prompt policy blob -> Prompt Context
-- Hash token -> PromptHash/InputHash
-- Audit actor -> OwnerId/TenantId/PrincipalDisplay
+- Workflow payload -> Playbook Execution Result
+- Step -> Stage, when referring to a CER contract
+- Output -> Materialization, when referring specifically to Record output
+- Ambient context -> Explicit Playbook Execution Context
 
 ## Sprint 0 Decisions
-1. Four-pillar governance is the canonical abstraction.
-2. Enforcement is validation-first and deterministic.
-3. Prompt composition is extensible but safety-constrained.
-4. Replay protection requires exact snapshot matching.
-5. Governed output validation is part of the product contract.
+1. The public abstraction is a typed CER playbook, not a workflow-runtime integration.
+2. Execution order is explicit and deterministic.
+3. Context is passed explicitly and is opt-in for Evaluate and Record stages.
+4. Existing stage contracts remain usable when a context-aware contract is not implemented.
+5. A policy evaluator validates evidence before applying policy.
 
 ## Traceability
-Canonical terms map to src/Goodtocode.Agents.Playbook/Application/* and src/Goodtocode.Agents.Playbook/Domain/*.
-This document is the ontology baseline for Sprint 1+.
+Canonical terms map to `src/Goodtocode.Agents.Playbook/Steps/*` and `src/Goodtocode.Agents.Playbook/Execution/*`.
+This document is the ontology baseline for future playbook capabilities.

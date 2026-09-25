@@ -1,7 +1,7 @@
 # AI Agent Operating Guide
 
 ## Purpose
-This file defines repository-specific operating rules for AI agents working in goodtocode/agent-governance.
+This file defines repository-specific operating rules for AI agents working in goodtocode/agents-playbook.
 
 ## Repository Scope
 - Primary deliverable: reusable .NET library package Goodtocode.Agents.Playbook.
@@ -13,19 +13,13 @@ This file defines repository-specific operating rules for AI agents working in g
 ## Required Reading Order
 1. .github/copilot-instructions.md
 2. README.md
-3. docs/governance/architecture.md
-4. docs/governance/coding-standards.md
-5. docs/governance/development-workflow.md
-6. docs/governance/sprint-0-step-1-ontology.md
-7. docs/governance/sprint-0-step-2-event-storming.md
-8. docs/product/sprint-0/agent-governance-sprint-0-ontology.md
-9. docs/product/sprint-0/agent-governance-sprint-0-context-diagram.md
-10. docs/product/features/*.md
+3. docs/product/sprint-0/agents-playbook-sprint-0-ontology.md
+4. docs/product/sprint-0/agents-playbook-sprint-0-context-diagram.md
 
 ## Agent Workflow
-1. Confirm target behavior from product/governance docs.
+1. Confirm target behavior from product docs.
 2. Keep changes minimal and inside the requested scope.
-3. Preserve library API intent (governance enforcement, validation, repeatability, defensibility).
+3. Preserve the typed CER execution API and deterministic behavior.
 4. Update or add tests when behavior changes.
 5. Verify with build/test before completion.
 

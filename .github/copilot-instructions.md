@@ -1,14 +1,13 @@
 # Copilot Instructions for Goodtocode.Agents.Playbook
 
 ## Project Overview
-Goodtocode.Agents.Playbook is a .NET governance library for AI inference workflows. It provides deterministic governance enforcement across observability, repeatability, auditability, and defensibility.
+Goodtocode.Agents.Playbook is a .NET library for strongly typed Collect, Evaluate, and Record playbooks. It provides deterministic stage execution with optional explicit context.
 
 ## Repository Shape
 - Solution: Goodtocode.Agents.Playbook.slnx
 - Library: src/Goodtocode.Agents.Playbook
 - Tests: src/Goodtocode.Agents.Playbook.Tests
 - Product docs: docs/product/**
-- Governance docs: docs/governance/**
 - Automation: .github/workflows/** and .github/scripts/**
 
 ## Coding Expectations
@@ -25,8 +24,8 @@ Goodtocode.Agents.Playbook is a .NET governance library for AI inference workflo
 
 ## Documentation Expectations
 When modifying docs, keep terms aligned with Sprint 0 artifacts:
-- docs/product/sprint-0/agent-governance-sprint-0-ontology.md
-- docs/product/sprint-0/agent-governance-sprint-0-context-diagram.md
+- docs/product/sprint-0/agents-playbook-sprint-0-ontology.md
+- docs/product/sprint-0/agents-playbook-sprint-0-context-diagram.md
 
 ## CI/CD Expectations
 - Ensure workflow commands match installed SDK and command semantics.

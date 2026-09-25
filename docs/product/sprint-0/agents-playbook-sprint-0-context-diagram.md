@@ -1,84 +1,77 @@
-# Agent Governance - Sprint 0 Context Diagram
+# Agents Playbook - Sprint 0 Context Diagram
 
 ## Sprint 0 Outcome
-Sprint 0 completed event storming and produced the context diagram for Goodtocode.Agents.Playbook in AI inference workflows.
+Sprint 0 captures the event flow and boundaries of the Goodtocode.Agents.Playbook CER execution engine.
 
 ## Context Boundary
-The library is an enforcement boundary between caller orchestration and downstream model inference.
+The library is a host-independent execution boundary between an orchestrator and typed Collect, Evaluate, and Record implementations. It does not own model inference, persistence, transport, or governance policy storage.
 
 ## High-Level Context Diagram
 ```mermaid
 flowchart LR
-    Caller[Orchestrator / Agent Runtime] --> Request[GovernanceEvaluationRequest]
-    Request --> Enforcer[GovernanceEnforcer]
-    Enforcer --> Hash[RepeatabilityHashService]
-    Enforcer --> Validator[EvaluationGovernanceValidator]
-    Validator -->|invalid| ValidationError[GovernanceValidationException]
-    Enforcer --> Composer[EvaluationGovernancePromptComposer]
-    Extension[IGovernanceDirectiveExtension*] --> Composer
-    Composer --> PromptCtx[EvaluationGovernancePromptContext]
-    Enforcer --> Result[GovernedEvaluationResult]
-    PromptCtx --> Result
-    Result --> Inference[Model Inference Runtime]
-    Baseline[Persisted Replay Baseline] --> ReplayGuard[GovernanceReplayGuard]
-    Result --> Snapshot[GovernanceReplaySnapshot]
-    Snapshot --> ReplayGuard
-    ReplayGuard -->|mismatch| Drift[Replay Drift Exception]
-    Inference --> Output[GovernedEvaluationOutputSchema]
+    Host[Host Orchestrator] --> Executor[PlaybookExecutor]
+    Definition[IPlaybookSteps]
+    Executor --> Definition
+    Definition --> Collect[ICollectStep]
+    Collect -->|typed evidence| Evaluate[IEvaluateStep]
+    Evaluate -->|typed finding| Record[IRecordStep]
+    Record -->|typed materialization| Result[PlaybookExecutionResult]
+    Context[PlaybookExecutionContext] -. optional .-> Executor
+    Context -. optional .-> Evaluate
+    Context -. optional .-> Record
+    Result --> Host
 ```
 
 ## Event Storming Artifacts
 
 ### Commands
-- EnforceGovernance
-- ComputeRepeatabilityHashes
-- ValidateGovernanceRecord
-- ComposeGovernedPrompt
-- ApplyGovernanceExtension
-- EnsureExactReplay
-- ValidateGovernedOutput
+- DefinePlaybook
+- ExecutePlaybook
+- CollectEvidence
+- EvaluateEvidence
+- RecordFinding
+- ExecuteWithContext
+- CancelExecution
 
 ### Domain Events
-- GovernanceEvaluationRequested
-- RepeatabilityHashComputed
-- GovernanceValidationPassed
-- GovernanceValidationFailed
-- GovernancePromptComposed
-- GovernanceExtensionApplied
-- GovernanceReplayCompared
-- GovernanceReplayDriftDetected
-- GovernedEvaluationProduced
-- GovernedOutputValidated
+- PlaybookExecutionStarted
+- EvidenceCollected
+- FindingEvaluated
+- MaterializationRecorded
+- PlaybookExecutionCompleted
+- PlaybookExecutionCancelled
+- EvidenceValidationCompleted
 
 ### Invariants Captured
-- Governance must validate before prompt output.
-- Confidence values remain in range 0..1.
-- Extension directives cannot bypass governance behavior.
-- Replay comparison is exact for policy/model/hash fields.
+- A definition is required before execution.
+- Collect runs before Evaluate, and Evaluate runs before Record.
+- Cancellation is checked before any stage begins and is forwarded to each stage.
+- Context-aware Evaluate and Record stages receive the same explicit context.
+- Execution metadata identifies the playbook and records start and completion timestamps.
+- Policy evaluation validates evidence before applying policy.
 
 ## Sequence View
 ```mermaid
 sequenceDiagram
-    participant Caller as Orchestrator
-    participant Enforcer as GovernanceEnforcer
-    participant Hash as RepeatabilityHashService
-    participant Validator as EvaluationGovernanceValidator
-    participant Composer as EvaluationGovernancePromptComposer
+    participant Host as Host Orchestrator
+    participant Executor as PlaybookExecutor
+    participant Collect as Collect Stage
+    participant Evaluate as Evaluate Stage
+    participant Record as Record Stage
 
-    Caller->>Enforcer: EnforceGovernance(request)
-    Enforcer->>Hash: Compute hashes (optional)
-    Enforcer->>Validator: Validate(governance)
-    alt invalid
-        Validator-->>Caller: GovernanceValidationException
-    else valid
-        Enforcer->>Composer: Compose(promptRequest)
-        Composer-->>Caller: GovernedEvaluationResult
-    end
+    Host->>Executor: ExecuteAsync(definition, input)
+    Executor->>Collect: ExecuteAsync(input)
+    Collect-->>Executor: evidence
+    Executor->>Evaluate: EvaluateAsync(evidence)
+    Evaluate-->>Executor: finding
+    Executor->>Record: RecordAsync(finding)
+    Record-->>Executor: materialization
+    Executor-->>Host: PlaybookExecutionResult
 ```
 
 ## Sprint 0 Decisions Reflected
-1. Enforcement is a mandatory pre-inference gateway.
-2. Deterministic hashing + validation are first-class preconditions.
-3. Prompt composition is deterministic and extension-safe.
-4. Replay guard is explicit and separate from prompt composition.
-5. Governed output contract is validated at domain boundary.
+1. The executor owns sequencing, not stage-specific business logic.
+2. Stage contracts are generic and independent of transport or persistence.
+3. Contextual behavior is opt-in and preserves the legacy stage contracts.
+4. Cancellation is part of every stage contract.
+5. The result is typed and contains execution metadata for the host.

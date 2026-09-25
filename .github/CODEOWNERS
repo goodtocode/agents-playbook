@@ -3,14 +3,9 @@
 # Default ownership
 * @OWNER
 
-# AI and governance knowledge framework
+# Repository documentation and automation
 /.github/ @OWNER
-/docs/governance/ @OWNER
 /docs/product/ @OWNER
 
-# Architecture-critical code
-/src/Core.Domain/ @OWNER
-/src/Core.Application/ @OWNER
-/src/Infrastructure.AgentFramework/ @OWNER
-/src/Presentation.Api/ @OWNER
-/src/Presentation.Web/ @OWNER
+# Library and tests
+/src/ @OWNER
