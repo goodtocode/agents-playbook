@@ -74,4 +74,51 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
                 startedUtc,
                 completedUtc));
     }
+
+    /// <summary>
+    /// Executes a CER playbook under an explicit repeatability replay mode. <see cref="PlaybookReplayMode.Rerun"/>
+    /// (the default when <paramref name="replay"/> is omitted) runs Collect, Evaluate, and Record fresh.
+    /// <see cref="PlaybookReplayMode.Recall"/> skips Collect and Evaluate and reuses
+    /// <see cref="PlaybookReplayContext{TEvidence,TFinding}.PriorEvidence"/> and
+    /// <see cref="PlaybookReplayContext{TEvidence,TFinding}.PriorFinding"/>, running only Record.
+    /// <see cref="PlaybookReplayMode.Replay"/> skips Collect and reuses
+    /// <see cref="PlaybookReplayContext{TEvidence,TFinding}.PriorEvidence"/>, but re-runs Evaluate and Record
+    /// to verify exact reproduction.
+    /// </summary>
+    public async Task<PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>> ExecuteAsync(
+        IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterialization> definition,
+        TCollectInput input,
+        PlaybookReplayContext<TEvidence, TFinding> replay,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(replay);
+        replay.Validate();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var startedUtc = DateTimeOffset.UtcNow;
+
+        var evidence = replay.Mode is PlaybookReplayMode.Recall or PlaybookReplayMode.Replay
+            ? replay.PriorEvidence!
+            : await definition.Collect.ExecuteAsync(input, cancellationToken);
+
+        var finding = replay.Mode == PlaybookReplayMode.Recall
+            ? replay.PriorFinding!
+            : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
+
+        var materialization = await definition.Record.RecordAsync(finding, cancellationToken);
+        var completedUtc = DateTimeOffset.UtcNow;
+
+        return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
+            evidence,
+            finding,
+            materialization,
+            new PlaybookExecutionMetadata(
+                definition.PlaybookKey,
+                definition.Version,
+                startedUtc,
+                completedUtc,
+                replay.Mode,
+                replay.SourceExecutionId));
+    }
 }
