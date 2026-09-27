@@ -149,6 +149,42 @@ Context-aware stages implement `IContextualEvaluateStep<,>` or `IContextualRecor
 
 For policy stages that should validate evidence before applying policy, derive from `PolicyEvaluateDefinitionBase<TEvidence, TFinding>` and implement `ValidateEvidenceAsync` and `EvaluatePolicyAsync`.
 
+## Rubric Scales: Discrete and Continuous
+
+`EvaluationRubric` (used by `PlaybookKnowledge.Rubric`) models a rubric's scale as one of exactly two shapes, not one class per rubric style:
+
+- `DiscreteEvaluationScale` — an ordered, ordinal Likert-style scale (`EvaluationScaleLevel(Level, Label, Description)`), shared across one or more criteria. A holistic rubric, an analytic rubric, and a checklist are all this same shape — the difference is only how many criteria and levels you supply, not a different type.
+- `ContinuousEvaluationScale` — numeric bands (`EvaluationScaleEntry(Name, Minimum, Maximum)`), for threshold/range-based scoring (for example, 90-100 = "Excellent") rather than discrete ordinal levels.
+
+Both implement `IEvaluationScale`, so `EvaluationRubric.Scale` and `EvaluationCriterion.ScaleOverride` are polymorphic over either shape.
+
+```csharp
+var scale = new DiscreteEvaluationScale(
+	"quality-scale",
+	[
+		new EvaluationScaleLevel(0, "Not implemented", "Criterion is missing entirely."),
+		new EvaluationScaleLevel(1, "Unsatisfactory", "Criterion is attempted but falls well short."),
+		new EvaluationScaleLevel(2, "Working towards satisfactory", "Criterion is partially met."),
+		new EvaluationScaleLevel(3, "Meets standards", "Criterion is fully satisfied."),
+		new EvaluationScaleLevel(4, "Exceeds standards", "Criterion is satisfied with notable strength."),
+		new EvaluationScaleLevel(5, "Greatly exceeds standards", "Criterion is satisfied exceptionally.")
+	]);
+
+var rubric = new EvaluationRubric(
+	"document-review-v1",
+	"1.0",
+	[
+		new EvaluationCriterion("clarity", "Clarity of writing"),
+		new EvaluationCriterion("accuracy", "Factual accuracy", Weight: 2d)
+	],
+	scale);
+```
+
+Most rubrics share one scale across every criterion, so `EvaluationCriterion.ScaleOverride` stays
+`null`. Set it only when a specific criterion genuinely needs different level wording than the
+rubric's shared scale — that criterion's row uses its own scale, every other criterion keeps using
+`EvaluationRubric.Scale`.
+
 ## Repeatability Replay Modes
 
 "Repeat this playbook" is ambiguous unless the caller declares *which* of three replay modes it
@@ -280,6 +316,25 @@ This is the same shape a MAF (or other agentic runtime) workflow adapter uses to
 node's tool per execution, so a playbook can freely mix a deterministic Collect, an agentic Evaluate,
 and a deterministic Record without the adapter changing.
 
+## Universal Prompt-Based Tools (Goodtocode.Agents.Playbook.Prompting)
+
+Most implementers eventually want a Collect, Evaluate, and Record tool that is 100 percent prompt-driven: the mapping instruction (or, for Evaluate, the rubric) fully describes how to turn the input into the typed output, so the tool implementation itself never changes across playbooks. The optional `Goodtocode.Agents.Playbook.Prompting` package provides exactly that, backed by `Microsoft.Extensions.AI`'s `IChatClient` and its structured-output support:
+
+```powershell
+dotnet add package Goodtocode.Agents.Playbook.Prompting
+```
+
+```csharp
+services.AddSingleton<IChatClient>(myConfiguredChatClient);
+services.AddUniversalPromptTools<ReviewRequest, ReviewEvidence, ReviewFinding, ReviewRecord>();
+```
+
+- `PromptCollectTool<TRawInput, TEvidence>` — takes a `PromptCollectRequest<TRawInput>(RawInput, MappingInstruction)`; the instruction carries all of the mapping intelligence.
+- `PromptEvaluateTool<TEvidence, TFinding>` — takes a `PromptEvaluateRequest<TEvidence>(Evidence, Rubric, AdditionalInstruction)`; the rubric is rendered deterministically by `EvaluationRubricPromptRenderer` before every model call, so the same rubric always produces the same prompt text.
+- `PromptRecordTool<TFinding, TMaterialization>` — takes a `PromptRecordRequest<TFinding>(Finding, RecordInstruction)`.
+
+All three are generic over any host-defined evidence/finding/materialization type, so `AddUniversalPromptTools<...>()` is called once per playbook shape, not once per tool. These tools report `DeterministicReplaySupported = false` to a governance recorder, since model output is not guaranteed byte-identical across calls — see [Goodtocode.Agents.Governance](https://github.com/Goodtocode/agents-governance)'s replay modes for how to model that correctly.
+
 ## Compatibility
 
 
@@ -293,6 +348,11 @@ The core package is independent of:
 - web hosting and worker runtimes
 
 Adapters can call model or tool APIs inside a stage while the playbook contract remains stable.
+
+The optional `Goodtocode.Agents.Playbook.Prompting` package is the one deliberate exception: it
+depends on `Microsoft.Extensions.AI` because that is its entire purpose (universal prompt-based
+tools). It is a separate NuGet package so a host that wants only the deterministic core never pulls
+in a model-client dependency it does not use.
 
 ## Development
 
