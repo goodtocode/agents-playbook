@@ -1,7 +1,7 @@
-name: NuGet CI/CD - Goodtocode.Agents.Playbook
+name: NuGet CI/CD - Goodtocode.Agents.Playbook.Prompting
 
 concurrency:
-  group: agents-playbook-nuget-${{ github.ref }}
+  group: agents-playbook-prompting-nuget-${{ github.ref }}
   cancel-in-progress: true
 
 on:
@@ -9,16 +9,18 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/agents-playbook-nuget.yml
+      - .github/workflows/agents-playbook-prompting-nuget.yml
       - src/Goodtocode.Agents.Playbook/**
-      - src/Goodtocode.Agents.Playbook.Tests/**
+      - src/Goodtocode.Agents.Playbook.Prompting/**
+      - src/Goodtocode.Agents.Playbook.Prompting.Tests/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/agents-playbook-nuget.yml
+      - .github/workflows/agents-playbook-prompting-nuget.yml
       - src/Goodtocode.Agents.Playbook/**
-      - src/Goodtocode.Agents.Playbook.Tests/**
+      - src/Goodtocode.Agents.Playbook.Prompting/**
+      - src/Goodtocode.Agents.Playbook.Prompting.Tests/**
   workflow_dispatch:
     inputs:
       environment:
@@ -38,10 +40,10 @@ permissions:
 env:
   CONFIGURATION: "Release"
   SCRIPTS_PATH: "./.github/scripts"
-  SRC_PATH: "./src/Goodtocode.Agents.Playbook"
-  PROJECT: "./src/Goodtocode.Agents.Playbook/Goodtocode.Agents.Playbook.csproj"
-  TEST_PATH: "Goodtocode.Agents.Playbook.Tests"
-  TEST_PROJECT: "./src/Goodtocode.Agents.Playbook.Tests/Goodtocode.Agents.Playbook.Tests.csproj"
+  SRC_PATH: "./src/Goodtocode.Agents.Playbook.Prompting"
+  PROJECT: "./src/Goodtocode.Agents.Playbook.Prompting/Goodtocode.Agents.Playbook.Prompting.csproj"
+  TEST_PATH: "Goodtocode.Agents.Playbook.Prompting.Tests"
+  TEST_PROJECT: "./src/Goodtocode.Agents.Playbook.Prompting.Tests/Goodtocode.Agents.Playbook.Prompting.Tests.csproj"
 jobs:
   ci:
     name: "NuGet CI"

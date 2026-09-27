@@ -46,25 +46,57 @@ public sealed record EvaluationRubric(
     string RubricId,
     string Version,
     IReadOnlyList<EvaluationCriterion> Criteria,
-    EvaluationScale Scale);
+    IEvaluationScale Scale);
 
 /// <summary>
-/// One criterion in a typed evaluation rubric.
+/// One criterion in a typed evaluation rubric. <see cref="ScaleOverride"/> is set only when this
+/// criterion's level wording differs from the rubric's shared <see cref="EvaluationRubric.Scale"/>;
+/// most criteria share one scale and leave this null.
 /// </summary>
 public sealed record EvaluationCriterion(
     string CriterionId,
     string Description,
-    double Weight = 1d);
+    double Weight = 1d,
+    IEvaluationScale? ScaleOverride = null);
 
 /// <summary>
-/// Typed scale metadata for rubric evaluation.
+/// Marker for the two supported evaluation scale shapes: a discrete, ordinal set of levels
+/// (<see cref="DiscreteEvaluationScale"/>), or a continuous set of numeric bands
+/// (<see cref="ContinuousEvaluationScale"/>). Rubric styles (holistic, analytic, checklist,
+/// weighted) are compositions of these two shapes, not separate types.
 /// </summary>
-public sealed record EvaluationScale(
-    string ScaleId,
-    IReadOnlyList<EvaluationScaleEntry> Entries);
+public interface IEvaluationScale
+{
+    string ScaleId { get; }
+}
 
 /// <summary>
-/// One named entry in an evaluation scale.
+/// A discrete, ordinal Likert-style scale shared across one or more criteria: an analytic rubric
+/// uses one shared <see cref="DiscreteEvaluationScale"/> across all criteria, a holistic rubric is
+/// the same shape with one criterion, and a checklist is the same shape with two levels.
+/// </summary>
+public sealed record DiscreteEvaluationScale(
+    string ScaleId,
+    IReadOnlyList<EvaluationScaleLevel> Levels) : IEvaluationScale;
+
+/// <summary>
+/// One ordinal level in a <see cref="DiscreteEvaluationScale"/>.
+/// </summary>
+public sealed record EvaluationScaleLevel(
+    int Level,
+    string Label,
+    string Description);
+
+/// <summary>
+/// A continuous numeric-band scale (for example, a score of 90-100 mapped to "Excellent"), used
+/// for threshold/range-based scoring rather than discrete ordinal levels.
+/// </summary>
+public sealed record ContinuousEvaluationScale(
+    string ScaleId,
+    IReadOnlyList<EvaluationScaleEntry> Entries) : IEvaluationScale;
+
+/// <summary>
+/// One named numeric band in a <see cref="ContinuousEvaluationScale"/>.
 /// </summary>
 public sealed record EvaluationScaleEntry(
     string Name,
