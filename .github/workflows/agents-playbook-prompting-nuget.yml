@@ -1,7 +1,7 @@
-name: NuGet CI/CD
+name: NuGet CI/CD - Goodtocode.Agents.Playbook.Prompting
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: agents-playbook-prompting-nuget-${{ github.ref }}
   cancel-in-progress: true
 
 on:
