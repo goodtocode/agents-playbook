@@ -246,7 +246,42 @@ var result = await executor.ExecuteAsync(
 	activityRecorder: myActivityStoreAdapter);
 ```
 
+## Per-Stage Tool Resolution and Registration
+
+A host that needs to mix deterministic and AI-agent/model-backed tools per stage — or run more than
+one tool per stage across different playbooks — can use `Goodtocode.Agents.Playbook.Tools` instead of
+hand-rolling keyed DI wiring:
+
+- `PlaybookToolKey` — a validated, normalized value-object key (lowercase letters, numbers, `.`, `_`,
+  `-`) identifying a registered tool.
+- `[PlaybookTool("your.tool.key")]` — declared on a concrete `*StepTool` implementation so a
+  reflection-based scanner can discover and key its registration without constructing an instance.
+- `AddPlaybookStepTools<TCollectInput, TEvidence, TEvaluateInput, TFinding, TRecordInput, TMaterialization>()`
+  — scans one or more assemblies for attributed tools and registers each with `AddKeyedScoped`. A
+  type implementing a stage interface without the attribute, or a duplicate key, fails registration
+  explicitly rather than being silently skipped or auto-keyed off a brittle string.
+- `IPlaybookStepToolResolver<...>` / `KeyedPlaybookStepToolResolver<...>` — resolves a stage's tool by
+  an optional `PlaybookToolKey`, falling back to a host-supplied default key when a playbook's contract
+  does not name one.
+
+```csharp
+services.AddPlaybookStepTools<ReviewRequest, ReviewEvidence, ReviewEvidence, ReviewFinding, ReviewFinding, ReviewRecord>(
+	typeof(Program).Assembly);
+
+services.AddSingleton<IPlaybookStepToolResolver<ReviewRequest, ReviewEvidence, ReviewEvidence, ReviewFinding, ReviewFinding, ReviewRecord>>(
+	sp => new KeyedPlaybookStepToolResolver<ReviewRequest, ReviewEvidence, ReviewEvidence, ReviewFinding, ReviewFinding, ReviewRecord>(
+		sp,
+		defaultCollectKey: PlaybookToolKey.Create("review.deterministic.collect"),
+		defaultEvaluateKey: PlaybookToolKey.Create("review.deterministic.evaluate"),
+		defaultRecordKey: PlaybookToolKey.Create("review.deterministic.record")));
+```
+
+This is the same shape a MAF (or other agentic runtime) workflow adapter uses to resolve each graph
+node's tool per execution, so a playbook can freely mix a deterministic Collect, an agentic Evaluate,
+and a deterministic Record without the adapter changing.
+
 ## Compatibility
+
 
 The core package is independent of:
 

@@ -55,7 +55,7 @@ jobs:
       RUNTIME_ENV: "Development"
       CONFIGURATION: "Release"
       VERSION_MAJOR: '1'
-      VERSION_MINOR: '1'
+      VERSION_MINOR: '2'
 
     steps:
       - name: checkout
