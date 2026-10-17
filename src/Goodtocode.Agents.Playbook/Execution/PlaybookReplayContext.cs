@@ -19,6 +19,7 @@ namespace Goodtocode.Agents.Playbook.Execution;
 /// Previously evaluated finding to reuse. Required for <see cref="PlaybookReplayMode.Recall"/> only;
 /// Replay re-evaluates the prior evidence instead of reusing the prior finding.
 /// </param>
+[Obsolete("Use PlaybookExecutionRequest<TEvidence, TFinding>. Removed in the next major release.")]
 public sealed record PlaybookReplayContext<TEvidence, TFinding>(
     PlaybookReplayMode Mode = PlaybookReplayMode.Rerun,
     string? SourceExecutionId = null,

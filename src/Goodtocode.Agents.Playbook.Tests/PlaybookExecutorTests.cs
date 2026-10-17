@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Legacy replay API stays covered until removal.
 using Goodtocode.Agents.Playbook.Execution;
 using Goodtocode.Agents.Playbook.Steps;
 
@@ -7,7 +8,7 @@ namespace Goodtocode.Agents.Playbook.Tests;
 public sealed class PlaybookExecutorTests
 {
     [TestMethod]
-    public async Task ExecuteAsync_runs_stages_in_order_and_returns_metadata()
+    public async Task ExecuteAsync_runs_actions_in_order_and_returns_metadata()
     {
         var calls = new List<string>();
         var definition = new TestPlaybook(calls);
@@ -25,7 +26,7 @@ public sealed class PlaybookExecutorTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_dispatches_context_to_contextual_stages()
+    public async Task ExecuteAsync_dispatches_context_to_contextual_actions()
     {
         var calls = new List<string>();
         var definition = new ContextualTestPlaybook(calls);
@@ -109,7 +110,7 @@ public sealed class PlaybookExecutorTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_with_default_replay_context_reruns_all_stages()
+    public async Task ExecuteAsync_with_default_replay_context_reruns_all_actions()
     {
         var calls = new List<string>();
         var definition = new TestPlaybook(calls);

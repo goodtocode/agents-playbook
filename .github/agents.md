@@ -35,3 +35,12 @@ AI agents must not:
 - Tests pass for affected areas.
 - Docs remain consistent with code.
 - File paths and naming match this repository.
+
+## Source Control Workflow
+- Leave all changes local and uncommitted. Do not run `git commit`, `git push`, or open pull requests; the maintainer reviews the uncommitted diff first and then commits, pushes, and opens the PR.
+- Do not create or switch branches unless asked. Summarize what changed so the diff can be reviewed.
+
+## NuGet Versioning
+- Do not alter `<Version>`, `<FileVersion>`, `<AssemblyVersion>`, `<InformationalVersion>`, or pin temporary versions (for example `9.9.0-local`) in any `.csproj`, and do not force version bumps.
+- Versioning is owned by `.github/scripts/ci/Set-Version.ps1` and `Get-Version.ps1`, driven by `VERSION_MAJOR`/`VERSION_MINOR` in the workflows. Only the maintainer changes those, and only when asked.
+- For local cross-repo testing, do not edit project files; ask the maintainer how to consume a local build.
