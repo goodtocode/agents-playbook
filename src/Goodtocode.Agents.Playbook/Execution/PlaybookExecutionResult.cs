@@ -1,3 +1,6 @@
+#pragma warning disable CS0618 // Metadata still reports the legacy replay mode for one release.
+using Goodtocode.Agents.Governance.Domain;
+
 namespace Goodtocode.Agents.Playbook.Execution;
 
 /// <summary>
@@ -10,7 +13,13 @@ public sealed record PlaybookExecutionResult<TEvidence, TFinding, TMaterializati
     TEvidence Evidence,
     TFinding Finding,
     TMaterialization Materialization,
-    PlaybookExecutionMetadata Metadata);
+    PlaybookExecutionMetadata Metadata)
+{
+    /// <summary>
+    /// Gets which actions ran. Skipped actions carry seeded values (Evidence/Finding) or a default Materialization.
+    /// </summary>
+    public ActionType ActionsExecuted { get; init; } = ActionType.All;
+}
 
 /// <summary>
 /// Captures execution metadata without introducing a transport-specific payload.

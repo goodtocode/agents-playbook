@@ -1,7 +1,7 @@
 namespace Goodtocode.Agents.Playbook.Execution;
 
 /// <summary>
-/// Explicit, typed knowledge and identity supplied to context-aware CER stages.
+/// Explicit, typed knowledge and identity supplied to context-aware CER actions.
 /// </summary>
 public sealed record PlaybookExecutionContext(
     PlaybookKnowledge Knowledge,
@@ -40,7 +40,7 @@ public sealed record PlaybookGovernanceContext(
     string? ProfileHash = null);
 
 /// <summary>
-/// Versioned typed rubric used by an evaluation stage.
+/// Versioned typed rubric used by an evaluation action.
 /// </summary>
 public sealed record EvaluationRubric(
     string RubricId,

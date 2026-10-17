@@ -1,7 +1,7 @@
 namespace Goodtocode.Agents.Playbook.Execution;
 
 /// <summary>
-/// Optional observer invoked after each CER stage completes, so a host can persist or emit
+/// Optional observer invoked after each CER action completes, so a host can persist or emit
 /// observability/auditability evidence without the executor knowing about any storage concern.
 /// </summary>
 /// <typeparam name="TEvidence">The evidence produced by Collect.</typeparam>

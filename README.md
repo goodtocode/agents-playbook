@@ -185,11 +185,54 @@ Most rubrics share one scale across every criterion, so `EvaluationCriterion.Sca
 rubric's shared scale — that criterion's row uses its own scale, every other criterion keeps using
 `EvaluationRubric.Scale`.
 
-## Repeatability Replay Modes
+## Repeating a Playbook (Rerun / Recall / Replay)
+
+Playbook builds on [Goodtocode.Agents.Governance](https://github.com/Goodtocode/agents-governance), which owns the
+repeatability policy. Governance decides *which actions run* for each `RepeatMode`; Playbook runs them. Referencing
+Playbook brings Governance in transitively.
+
+`PlaybookExecutionRequest<TEvidence, TFinding>` carries a Governance `RepeatRequest` plus the prior state that
+skipped actions stand in with:
+
+| Mode | Actions run (default policy) | Seeds required |
+|---|---|---|
+| `Rerun` | Collect, Evaluate, Record | none |
+| `Replay` | Evaluate, Record | `SeedEvidence` |
+| `Recall` | none (pure read) | `SeedEvidence`, `SeedFinding` |
+
+`PlaybookExecutor` plans through `IRepeatPolicy` (a `DefaultRepeatPolicy` unless you pass your own to the
+constructor). A skipped action without a seed throws `InvalidOperationException`; seeds for actions that run are ignored. Skipped actions do
+not notify the `IPlaybookStepActivityRecorder` and do not save checkpoints. `result.ActionsExecuted` reports exactly
+which actions ran, and `Metadata.SourceExecutionId` carries the source run.
+
+```csharp
+var request = new PlaybookExecutionRequest<ReviewEvidence, ReviewFinding>
+{
+	Repeat = RepeatRequest.Create(RepeatMode.Replay, "run-123"),
+	SeedEvidence = priorEvidence,
+	RunId = "run-456"                    // optional: save checkpoints under this run
+};
+
+var result = await executor.ExecuteAsync(
+	new DocumentReviewPlaybook(), new ReviewRequest("Document content"), request,
+	cancellationToken, checkpoints: checkpointStore);
+```
+### Checkpoint store port
+
+`IPlaybookCheckpointStore<TEvidence, TFinding>` (`SaveAsync`, `LoadAsync(runId, action)`, `LoadLatestAsync(runId)`)
+is a port only. When a `RunId` and a store are supplied the executor saves typed state after each action that
+runs. Implement it with rows, EF, or blobs; `InMemoryPlaybookCheckpointStore<,>` is provided for tests and samples.
+
+## Legacy Repeatability Replay Modes (obsolete)
+
+> `PlaybookReplayMode`, `PlaybookReplayContext`, and the replay `ExecuteAsync` overload are obsolete and will be
+> removed in the next major release. Use `PlaybookExecutionRequest` above. Migration: Rerun = default request;
+> Replay = `RepeatMode.Replay` + `SeedEvidence`; Recall = `RepeatMode.Recall` + both seeds (a pure read; the legacy
+> overload still ran Record).
 
 "Repeat this playbook" is ambiguous unless the caller declares *which* of three replay modes it
 means. `PlaybookReplayContext<TEvidence, TFinding>` makes that declaration explicit and the executor
-enforces the corresponding stage behavior:
+enforces the corresponding action behavior:
 
 - **Rerun** (default): run Collect, Evaluate, and Record fresh. This is what happens when no
   `PlaybookReplayContext` is supplied, and it is the correct mode for "has the source changed" or

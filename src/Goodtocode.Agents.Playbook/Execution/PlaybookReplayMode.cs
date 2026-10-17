@@ -3,6 +3,7 @@ namespace Goodtocode.Agents.Playbook.Execution;
 /// <summary>
 /// Declares which of the three repeatability behaviors a CER execution is performing.
 /// </summary>
+[Obsolete("Use PlaybookExecutionRequest<TEvidence, TFinding>. Removed in the next major release.")]
 public enum PlaybookReplayMode
 {
     /// <summary>
