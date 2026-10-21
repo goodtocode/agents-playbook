@@ -20,6 +20,11 @@ flowchart LR
     Context -. optional .-> Evaluate
     Context -. optional .-> Record
     Result --> Host
+    Host --> Governed[GovernedChatClient]
+    Scope[IGovernedIntentScope] --> Governed
+    Provider[IIntentPolicyProvider] --> Governed
+    Governed -->|Instruction + Preamble per LLM action| Model[IChatClient]
+    Governed --> Observer[IGovernedTurnObserver]
 ```
 
 ## Event Storming Artifacts

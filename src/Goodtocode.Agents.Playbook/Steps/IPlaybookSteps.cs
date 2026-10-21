@@ -1,3 +1,5 @@
+using Goodtocode.Agents.Governance.Application;
+
 namespace Goodtocode.Agents.Playbook.Steps;
 
 /// <summary>
@@ -23,6 +25,12 @@ public interface IPlaybookSteps<TCollectInput, TEvidence, TFinding, TMaterializa
     /// Gets the Collect stage.
     /// </summary>
     ICollectStep<TCollectInput, TEvidence> Collect { get; }
+
+    /// <summary>
+    /// Gets the optional Instruction that applies to the entire playbook run, across all stages. It is stated once
+    /// per run and composed before the Agentic Intent policy by the governed chat client.
+    /// </summary>
+    AgentInstruction? Instruction => null;
 
     /// <summary>
     /// Gets the Evaluate stage.

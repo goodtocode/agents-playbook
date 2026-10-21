@@ -16,6 +16,24 @@ Goodtocode.Agents.Playbook gives a host a small, explicit execution boundary:
 
 The executor owns ordering, cancellation, optional execution context, and execution metadata. Your application owns the actual collection, policy, model calls, persistence, and transport.
 
+## Governed CER: Four Pillars and One Policy
+
+Normal AI development stops at "prompt, call the model, log something." It omits two things that make AI workflows trustworthy: **governance** and **workflow structure**. Playbook supplies the structure (CER) and builds on [Goodtocode.Agents.Governance](https://github.com/Goodtocode/agents-governance) for the governance, so every Collect, Evaluate and Record step is assured and intent-bound.
+
+| CER step | Observability | Auditability | Repeatability | Defensibility | Agentic Intent policy |
+|----------|---------------|--------------|---------------|---------------|-----------------------|
+| **Collect** | Trace and evidence refs for what was gathered | Owner, tenant, tool that collected | Collect can be recalled or replayed from checkpoints | Evidence refs back later decisions | Preamble before every LLM Collect action |
+| **Evaluate** | Scores and criteria are traceable | Who or what evaluated | Rubric rendered deterministically; prompt hash detects drift | Findings cite evidence, rubric and principle ids | Preamble before every LLM Evaluate action |
+| **Record** | Materialization is observable | Who recorded, under which policy | Recall returns the persisted record | Recorded outcome is justified | Preamble before every LLM Record action |
+
+**Agentic Intent** is the first governance *policy*: versioned values and boundaries (law, no direct harm, growth, collaboration, respect). It sits beside the four pillars, not as a fifth pillar.
+
+- **Instruction**: once per playbook run, session or instantiation (`IGovernedIntentScope.Instruction` plus the intent policy).
+- **Preamble**: before every LLM action in Collect, Evaluate and Record (and every chat message). Non-LLM steps are unaffected.
+- Playbook decides *where* these apply. Governance defines *what* they are, and policy text is supplied by a host through `IIntentPolicyProvider`.
+
+See [Governed Agentic Intent in CER](#governed-agentic-intent-in-cer-goodtocodeagentsplaybookprompting) and [feature-governed-intent-in-cer.md](docs/product/features/feature-governed-intent-in-cer.md).
+
 ## Why Playbook?
 
 AI workflows often grow into a collection of framework-specific helpers: one package for prompt orchestration, another for evaluation, another for tracing, and another for persistence. That can make the business flow difficult to discover and the contracts difficult to test.
@@ -377,6 +395,34 @@ services.AddUniversalPromptTools<ReviewRequest, ReviewEvidence, ReviewFinding, R
 - `PromptRecordTool<TFinding, TMaterialization>` — takes a `PromptRecordRequest<TFinding>(Finding, RecordInstruction)`.
 
 All three are generic over any host-defined evidence/finding/materialization type, so `AddUniversalPromptTools<...>()` is called once per playbook shape, not once per tool. These tools report `DeterministicReplaySupported = false` to a governance recorder, since model output is not guaranteed byte-identical across calls — see [Goodtocode.Agents.Governance](https://github.com/Goodtocode/agents-governance)'s replay modes for how to model that correctly.
+
+## Governed Agentic Intent in CER (Goodtocode.Agents.Playbook.Prompting)
+
+`GovernedChatClient` is the single, shared seam that applies Agentic Intent to every LLM action. Wrap the chat client once; the universal tools (and chat) need no per-tool changes. Each tool marks its stage (`GovernedTurnKind.Collect`, `Evaluate`, `Record`) and the client then:
+
+1. Applies the **Instruction** (scope Instruction plus the intent policy) as the first system message.
+2. Prepends the **Preamble** immediately before the final message, in Compact (principle ids) or Full mode.
+3. Reports the policy id, version and hash for the turn to an `IGovernedTurnObserver`, so a host can persist it in step or chat execution metadata. A policy change shows up as drift through the governance replay guard.
+4. **Fails closed** when `IntentRequired` is set and no policy resolves.
+
+```csharp
+services.AddGovernedIntentPreamble();
+var ledger = new GovernedTurnLedger();
+services.AddSingleton<IGovernedTurnObserver>(ledger);
+services.AddScoped<IGovernedIntentScope>(_ => new GovernedIntentScope(tenantId, "us-ca", definition.Instruction));
+services.AddSingleton<IChatClient>(sp => new ChatClientBuilder(innerClient)
+    .UseGovernedIntent(new GovernedChatClientOptions
+    {
+        IntentRequired = true,
+        PreambleMode = GovernancePreambleMode.Compact
+        // Remove a stage from PreambleTurns to opt that stage out. The opt-out is recorded on the turn.
+    })
+    .Build(sp));
+```
+
+A playbook declares its Instruction as a typed `IPlaybookSteps.Instruction` (`AgentInstruction?`). Pass the ledger to `new PlaybookExecutor(repeatPolicy, ledger)` and `IPlaybookStepActivityRecorder` receives each step's `governedTurns` (policy id, version, hash), so every stage's metadata proves which policy governed it. Verify outputs with governance `IIntentOutputVerifier`.
+
+The caller's message list is never modified, so the persisted chat bubble sequence stays the source of truth. Policy text and legal rules never live in playbook.
 
 ## Compatibility
 

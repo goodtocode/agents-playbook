@@ -1,3 +1,5 @@
+using Goodtocode.Agents.Governance.Domain;
+using Goodtocode.Agents.Playbook.Prompting.Governance;
 using Goodtocode.Agents.Playbook.Steps;
 using Microsoft.Extensions.AI;
 
@@ -24,7 +26,7 @@ public sealed class PromptRecordTool<TFinding, TMaterialization>(IChatClient cha
             {finding.Finding}
             """;
 
-        var response = await chatClient.GetResponseAsync<TMaterialization>(prompt, cancellationToken: cancellationToken);
+        var response = await chatClient.GetResponseAsync<TMaterialization>(prompt, GovernedChatOptionKeys.ForTurn(GovernedTurnKind.Record), cancellationToken: cancellationToken);
         return response.Result;
     }
 }

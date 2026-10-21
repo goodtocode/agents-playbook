@@ -14,6 +14,7 @@ namespace Goodtocode.Agents.Playbook.Execution;
 public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMaterialization>
 {
     private readonly IRepeatPolicy _repeatPolicy;
+    private readonly GovernedTurnLedger? _turns;
 
     /// <summary>
     /// Initializes an executor using the default governance repeat policy.
@@ -27,9 +28,14 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
     /// Initializes an executor that plans repeats with the supplied governance policy.
     /// </summary>
     /// <param name="repeatPolicy">Decides which actions run for each repeat mode.</param>
-    public PlaybookExecutor(IRepeatPolicy repeatPolicy)
+    /// <param name="turns">
+    /// Optional ledger the governed chat client reports to. When supplied, the executor drains it after each
+    /// action and passes the governed turns (Instruction, policy id, version, hash, Preamble) to the activity recorder.
+    /// </param>
+    public PlaybookExecutor(IRepeatPolicy repeatPolicy, GovernedTurnLedger? turns = null)
     {
         _repeatPolicy = repeatPolicy ?? throw new ArgumentNullException(nameof(repeatPolicy));
+        _turns = turns;
     }
 
     /// <summary>
@@ -48,13 +54,13 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
 
         var startedUtc = DateTimeOffset.UtcNow;
         var evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
-        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
+        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), DrainTurns(), cancellationToken);
 
         var finding = await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
-        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
+        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), DrainTurns(), cancellationToken);
 
         var materialization = await definition.Record.RecordAsync(finding, cancellationToken);
-        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
+        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), DrainTurns(), cancellationToken);
         var completedUtc = DateTimeOffset.UtcNow;
 
         return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
@@ -88,17 +94,17 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
 
         var startedUtc = DateTimeOffset.UtcNow;
         var evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
-        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
+        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), DrainTurns(), cancellationToken);
 
         var finding = definition.Evaluate is IEvaluateStepContext<TEvidence, TFinding> contextualEvaluate
             ? await contextualEvaluate.EvaluateAsync(evidence, context, cancellationToken)
             : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
-        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
+        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), DrainTurns(), cancellationToken);
 
         var materialization = definition.Record is IRecordStepContext<TFinding, TMaterialization> contextualRecord
             ? await contextualRecord.RecordAsync(finding, context, cancellationToken)
             : await definition.Record.RecordAsync(finding, cancellationToken);
-        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
+        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), DrainTurns(), cancellationToken);
         var completedUtc = DateTimeOffset.UtcNow;
 
         return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
@@ -142,15 +148,15 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
         var evidence = replay.Mode is PlaybookReplayMode.Recall or PlaybookReplayMode.Replay
             ? replay.PriorEvidence!
             : await definition.Collect.ExecuteAsync(input, cancellationToken);
-        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
+        await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), DrainTurns(), cancellationToken);
 
         var finding = replay.Mode == PlaybookReplayMode.Recall
             ? replay.PriorFinding!
             : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
-        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
+        await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), DrainTurns(), cancellationToken);
 
         var materialization = await definition.Record.RecordAsync(finding, cancellationToken);
-        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
+        await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), DrainTurns(), cancellationToken);
         var completedUtc = DateTimeOffset.UtcNow;
 
         return new PlaybookExecutionResult<TEvidence, TFinding, TMaterialization>(
@@ -203,7 +209,7 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
         else
         {
             evidence = await definition.Collect.ExecuteAsync(input, cancellationToken);
-            await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), cancellationToken);
+            await recorder.OnCollectedAsync(identity, evidence, ResolveToolName(definition.Collect), DrainTurns(), cancellationToken);
             await SaveAsync(store, request.RunId, ActionType.Collect, evidence, default, cancellationToken);
         }
 
@@ -217,7 +223,7 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
             finding = context is not null && definition.Evaluate is IEvaluateStepContext<TEvidence, TFinding> contextualEvaluate
                 ? await contextualEvaluate.EvaluateAsync(evidence, context, cancellationToken)
                 : await definition.Evaluate.EvaluateAsync(evidence, cancellationToken);
-            await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), cancellationToken);
+            await recorder.OnEvaluatedAsync(identity, finding, ResolveToolName(definition.Evaluate), DrainTurns(), cancellationToken);
             await SaveAsync(store, request.RunId, ActionType.Evaluate, evidence, finding, cancellationToken);
         }
 
@@ -227,7 +233,7 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
             materialization = context is not null && definition.Record is IRecordStepContext<TFinding, TMaterialization> contextualRecord
                 ? await contextualRecord.RecordAsync(finding, context, cancellationToken)
                 : await definition.Record.RecordAsync(finding, cancellationToken);
-            await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), cancellationToken);
+            await recorder.OnRecordedAsync(identity, materialization, ResolveToolName(definition.Record), DrainTurns(), cancellationToken);
             await SaveAsync(store, request.RunId, ActionType.Record, evidence, finding, cancellationToken);
         }
 
@@ -245,6 +251,8 @@ public sealed class PlaybookExecutor<TCollectInput, TEvidence, TFinding, TMateri
             ActionsExecuted = plan.Run
         };
     }
+
+    private IReadOnlyList<GovernedTurnRecord> DrainTurns() => _turns?.Drain() ?? [];
 
     private static Task SaveAsync(
         IPlaybookCheckpointStore<TEvidence, TFinding>? store,
