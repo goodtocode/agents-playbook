@@ -18,9 +18,10 @@ Define the terms used in the public contracts, execution flow, tests, and produc
 - Policy Evaluation: The validate-then-evaluate flow provided by `PolicyEvaluateDefinitionBase`.
 - Deterministic Order: Collect completes before Evaluate, and Evaluate completes before Record.
 - Governed CER: each CER step is assured by the four governance pillars and bound by the Agentic Intent policy.
-- Instruction: once per playbook run, session or instantiation; carried by `IGovernedIntentScope`.
+- Instruction: typed governance `AgentInstruction` declared on `IPlaybookSteps.Instruction`; once per playbook run, session or instantiation; carried to the chat client by `IGovernedIntentScope`.
 - Preamble: before every LLM-type Collect, Evaluate or Record action and every chat message; applied by `GovernedChatClient`, never rendered as a chat bubble.
-- Governed Turn: one model call tagged `GovernedTurnKind` (Collect, Evaluate, Record, Chat) and reported to `IGovernedTurnObserver`.
+- Governed Turn: one model call tagged `GovernedTurnKind` (Collect, Evaluate, Record, Chat) and reported to `IGovernedTurnObserver`; `GovernedTurnLedger` collects them and `PlaybookExecutor` passes them to `IPlaybookStepActivityRecorder` as `governedTurns`.
+- Intent Verification: governance `IIntentOutputVerifier` (Phase D) checks outputs cite policy principles.
 
 ## Ubiquitous Language (Approved)
 Playbook, Stage, Collect, Evidence, Evaluate, Finding, Record, Materialization, Execution, Context, Definition, Deterministic Order.
