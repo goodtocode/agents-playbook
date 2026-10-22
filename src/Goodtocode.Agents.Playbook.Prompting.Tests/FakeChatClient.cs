@@ -11,12 +11,15 @@ internal sealed class FakeChatClient(string jsonResponse) : IChatClient
 {
     public string? LastPromptText { get; private set; }
 
+    public IReadOnlyList<ChatMessage>? LastMessages { get; private set; }
+
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        LastPromptText = string.Join(Environment.NewLine, messages.Select(message => message.Text));
+        LastMessages = messages.ToList();
+        LastPromptText = string.Join(Environment.NewLine, LastMessages.Select(message => message.Text));
 
         var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, jsonResponse));
         return Task.FromResult(response);

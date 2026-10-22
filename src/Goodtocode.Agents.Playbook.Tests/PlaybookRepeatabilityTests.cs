@@ -198,21 +198,21 @@ public sealed class PlaybookRepeatabilityTests
         public List<string> Events { get; } = [];
         public PlaybookIdentity? Identity { get; private set; }
 
-        public Task OnCollectedAsync(PlaybookIdentity identity, string evidence, string? toolName, CancellationToken cancellationToken = default)
+        public Task OnCollectedAsync(PlaybookIdentity identity, string evidence, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default)
         {
             Identity = identity;
             Events.Add("collected");
             return Task.CompletedTask;
         }
 
-        public Task OnEvaluatedAsync(PlaybookIdentity identity, string finding, string? toolName, CancellationToken cancellationToken = default)
+        public Task OnEvaluatedAsync(PlaybookIdentity identity, string finding, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default)
         {
             Identity = identity;
             Events.Add("evaluated");
             return Task.CompletedTask;
         }
 
-        public Task OnRecordedAsync(PlaybookIdentity identity, string materialization, string? toolName, CancellationToken cancellationToken = default)
+        public Task OnRecordedAsync(PlaybookIdentity identity, string materialization, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default)
         {
             Identity = identity;
             Events.Add("recorded");

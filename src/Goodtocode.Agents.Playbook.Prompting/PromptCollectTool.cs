@@ -1,3 +1,5 @@
+using Goodtocode.Agents.Governance.Domain;
+using Goodtocode.Agents.Playbook.Prompting.Governance;
 using Goodtocode.Agents.Playbook.Steps;
 using Microsoft.Extensions.AI;
 
@@ -25,7 +27,7 @@ public sealed class PromptCollectTool<TRawInput, TEvidence>(IChatClient chatClie
             {input.RawInput}
             """;
 
-        var response = await chatClient.GetResponseAsync<TEvidence>(prompt, cancellationToken: cancellationToken);
+        var response = await chatClient.GetResponseAsync<TEvidence>(prompt, GovernedChatOptionKeys.ForTurn(GovernedTurnKind.Collect), cancellationToken: cancellationToken);
         return response.Result;
     }
 }

@@ -1,3 +1,5 @@
+using Goodtocode.Agents.Governance.Domain;
+using Goodtocode.Agents.Playbook.Prompting.Governance;
 using Goodtocode.Agents.Playbook.Steps;
 using Microsoft.Extensions.AI;
 
@@ -29,7 +31,7 @@ public sealed class PromptEvaluateTool<TEvidence, TFinding>(IChatClient chatClie
             {evidence.Evidence}
             """;
 
-        var response = await chatClient.GetResponseAsync<TFinding>(prompt, cancellationToken: cancellationToken);
+        var response = await chatClient.GetResponseAsync<TFinding>(prompt, GovernedChatOptionKeys.ForTurn(GovernedTurnKind.Evaluate), cancellationToken: cancellationToken);
         return response.Result;
     }
 }

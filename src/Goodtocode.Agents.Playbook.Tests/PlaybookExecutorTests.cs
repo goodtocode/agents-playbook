@@ -1,4 +1,6 @@
 #pragma warning disable CS0618 // Legacy replay API stays covered until removal.
+using Goodtocode.Agents.Governance.Application;
+using Goodtocode.Agents.Governance.Domain;
 using Goodtocode.Agents.Playbook.Execution;
 using Goodtocode.Agents.Playbook.Steps;
 
@@ -7,6 +9,30 @@ namespace Goodtocode.Agents.Playbook.Tests;
 [TestClass]
 public sealed class PlaybookExecutorTests
 {
+    [TestMethod]
+    public async Task ExecuteAsync_passes_governed_turns_to_recorder_per_step()
+    {
+        var ledger = new GovernedTurnLedger();
+        var definition = new LedgerPlaybook(["collect", "evaluate", "record"], ledger);
+        var recorder = new RecordingActivityRecorder();
+        var executor = new PlaybookExecutor<string, string, string, string>(new DefaultRepeatPolicy(), ledger);
+
+        await executor.ExecuteAsync(definition, "input", TestContext.CancellationToken, recorder);
+
+        Assert.HasCount(3, recorder.Turns);
+        Assert.AreEqual(GovernedTurnKind.Collect, recorder.Turns[0].Single().Turn);
+        Assert.AreEqual(GovernedTurnKind.Evaluate, recorder.Turns[1].Single().Turn);
+        Assert.AreEqual(GovernedTurnKind.Record, recorder.Turns[2].Single().Turn);
+        Assert.AreEqual("policy-hash", recorder.Turns[0].Single().PolicyHash);
+    }
+
+    [TestMethod]
+    public void PlaybookInstruction_defaults_to_null_and_is_typed_when_declared()
+    {
+        Assert.IsNull(((IPlaybookSteps<string, string, string, string>)new TestPlaybook([])).Instruction);
+        Assert.AreEqual(InstructionScope.Playbook, new LedgerPlaybook([], new GovernedTurnLedger()).Instruction!.Scope);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_runs_actions_in_order_and_returns_metadata()
     {
@@ -205,6 +231,43 @@ public sealed class PlaybookExecutorTests
         public IRecordStep<string, string> Record => new RecordStep(calls);
     }
 
+    private sealed class LedgerPlaybook(List<string> calls, GovernedTurnLedger ledger) : IPlaybookSteps<string, string, string, string>
+    {
+        public string PlaybookKey => "ledger-playbook";
+        public string Version => "1.0";
+        public AgentInstruction? Instruction { get; } = AgentInstruction.Create("Run carefully.", InstructionScope.Playbook);
+        public ICollectStep<string, string> Collect => new LedgerCollect(ledger);
+        public IEvaluateStep<string, string> Evaluate => new LedgerEvaluate(ledger);
+        public IRecordStep<string, string> Record => new LedgerRecord(ledger);
+    }
+
+    private sealed class LedgerCollect(GovernedTurnLedger ledger) : ICollectStep<string, string>
+    {
+        public async Task<string> ExecuteAsync(string input, CancellationToken cancellationToken = default)
+        {
+            await ledger.OnGovernedTurnAsync(new GovernedTurnRecord(GovernedTurnKind.Collect, "p", "1", "policy-hash", true, true), cancellationToken);
+            return input;
+        }
+    }
+
+    private sealed class LedgerEvaluate(GovernedTurnLedger ledger) : IEvaluateStep<string, string>
+    {
+        public async Task<string> EvaluateAsync(string evidence, CancellationToken cancellationToken = default)
+        {
+            await ledger.OnGovernedTurnAsync(new GovernedTurnRecord(GovernedTurnKind.Evaluate, "p", "1", "policy-hash", true, true), cancellationToken);
+            return evidence;
+        }
+    }
+
+    private sealed class LedgerRecord(GovernedTurnLedger ledger) : IRecordStep<string, string>
+    {
+        public async Task<string> RecordAsync(string finding, CancellationToken cancellationToken = default)
+        {
+            await ledger.OnGovernedTurnAsync(new GovernedTurnRecord(GovernedTurnKind.Record, "p", "1", "policy-hash", true, true), cancellationToken);
+            return finding;
+        }
+    }
+
     private sealed class ContextualTestPlaybook(List<string> calls) : IPlaybookSteps<string, string, string, string>
     {
         public string PlaybookKey => "contextual-playbook";
@@ -322,26 +385,30 @@ public sealed class PlaybookExecutorTests
         public string? EvaluatedToolName { get; private set; }
         public string? RecordedMaterialization { get; private set; }
         public string? RecordedToolName { get; private set; }
+        public List<IReadOnlyList<GovernedTurnRecord>> Turns { get; } = [];
 
-        public Task OnCollectedAsync(PlaybookIdentity identity, string evidence, string? toolName, CancellationToken cancellationToken = default)
+        public Task OnCollectedAsync(PlaybookIdentity identity, string evidence, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default)
         {
             Identity = identity;
             CollectedEvidence = evidence;
             CollectedToolName = toolName;
+            Turns.Add(governedTurns);
             return Task.CompletedTask;
         }
 
-        public Task OnEvaluatedAsync(PlaybookIdentity identity, string finding, string? toolName, CancellationToken cancellationToken = default)
+        public Task OnEvaluatedAsync(PlaybookIdentity identity, string finding, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default)
         {
             EvaluatedFinding = finding;
             EvaluatedToolName = toolName;
+            Turns.Add(governedTurns);
             return Task.CompletedTask;
         }
 
-        public Task OnRecordedAsync(PlaybookIdentity identity, string materialization, string? toolName, CancellationToken cancellationToken = default)
+        public Task OnRecordedAsync(PlaybookIdentity identity, string materialization, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default)
         {
             RecordedMaterialization = materialization;
             RecordedToolName = toolName;
+            Turns.Add(governedTurns);
             return Task.CompletedTask;
         }
     }

@@ -126,9 +126,9 @@ public sealed class PlaybookExecutionRequestTests
     private sealed class CountingRecorder : IPlaybookStepActivityRecorder<string, string, string>
     {
         public int Count { get; private set; }
-        public Task OnCollectedAsync(PlaybookIdentity identity, string evidence, string? toolName, CancellationToken cancellationToken = default) { Count++; return Task.CompletedTask; }
-        public Task OnEvaluatedAsync(PlaybookIdentity identity, string finding, string? toolName, CancellationToken cancellationToken = default) { Count++; return Task.CompletedTask; }
-        public Task OnRecordedAsync(PlaybookIdentity identity, string materialization, string? toolName, CancellationToken cancellationToken = default) { Count++; return Task.CompletedTask; }
+        public Task OnCollectedAsync(PlaybookIdentity identity, string evidence, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default) { Count++; return Task.CompletedTask; }
+        public Task OnEvaluatedAsync(PlaybookIdentity identity, string finding, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default) { Count++; return Task.CompletedTask; }
+        public Task OnRecordedAsync(PlaybookIdentity identity, string materialization, string? toolName, IReadOnlyList<GovernedTurnRecord> governedTurns, CancellationToken cancellationToken = default) { Count++; return Task.CompletedTask; }
     }
 
     private sealed class Playbook(List<string> calls) : IPlaybookSteps<string, string, string, string>
