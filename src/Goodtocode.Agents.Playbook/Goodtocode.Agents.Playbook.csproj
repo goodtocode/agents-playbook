@@ -31,7 +31,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Goodtocode.Agents.Governance" Version="3.0.16" />
+		<PackageReference Include="Goodtocode.Agents.Governance" Version="3.0.17" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
 	</ItemGroup>
 
